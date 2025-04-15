@@ -8,7 +8,7 @@ This project analyzes clickstream data from an e-commerce platform to predict cu
 Determine whether a customer will complete a purchase based on browsing behavior.  
 
 2.  __Estimate Potential Revenue (Regression)__  
-Forecast expected revenue per user based on historical data.  
+Forecast expected revenue per user based on historical data. 
 
 3.  __Segment Customers (Clustering)__  
 Identify distinct customer groups based on behavioral patterns to enable targeted marketing.  
