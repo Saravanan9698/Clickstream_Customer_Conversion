@@ -8,6 +8,15 @@ import plotly.express as px
 from sklearn.cluster import KMeans
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
+import streamlit as st_version_check  # For version checking
+
+# Check Streamlit version compatibility
+required_version = "1.28.0"
+try:
+    assert st_version_check.__version__ >= required_version, f"Streamlit version {required_version} or higher is required. You are using {st_version_check.__version__}."
+except AssertionError as e:
+    st.error(e)
+    st.stop()
 
 # Set page configuration
 st.set_page_config(page_title="Customer Conversion Analysis", layout="wide")
@@ -15,7 +24,26 @@ st.set_page_config(page_title="Customer Conversion Analysis", layout="wide")
 # Base directory for relative paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Theme toggle in sidebar
+st.sidebar.markdown("### Theme Settings")
+theme = st.sidebar.selectbox("Choose Theme", ["Dark", "Light"], key="theme_selection")
+if theme == "Light":
+    background_style = """
+        background-color: #f0f2f6;
+        color: black;
+    """
+    header_style = "color: #333;"
+else:
+    background_style = """
+        background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.5)), url('data:image/jpeg;base64,{img_base64}');
+        background-size: cover;
+        background-position: center;
+        color: white;
+    """
+    header_style = "color: #FFD700;"
+
 # Background image
+@st.cache_data
 def img_to_base64(image_path):
     try:
         with open(image_path, "rb") as img_file:
@@ -25,27 +53,93 @@ def img_to_base64(image_path):
         return None
 
 image_path = os.path.join(BASE_DIR, "Image", "black-friday-elements-assortment.jpg")
+img_base64 = None
 if os.path.exists(image_path):
     img_base64 = img_to_base64(image_path)
-    if img_base64:
-        st.markdown(f"""
-            <style>
-            .stApp {{
-                background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.5)), url('data:image/jpeg;base64,{img_base64}');
-                background-size: cover;
-                background-position: center;
-                color: white;
-            }}
-            h1, h2, h3 {{
-                color: #FFD700;
-            }}
-            .stButton>button {{
-                background-color: #4CAF50;
-                color: white;
-                border-radius: 5px;
-            }}
-            </style>
-        """, unsafe_allow_html=True)
+
+# Apply theme-based styling
+if img_base64 and theme == "Dark":
+    st.markdown(f"""
+        <style>
+        .stApp {{
+            {background_style.format(img_base64=img_base64)}
+        }}
+        h1, h2, h3 {{
+            {header_style}
+        }}
+        .stButton>button {{
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }}
+        .stButton>button:hover {{
+            background-color: #45a049;
+        }}
+        .stRadio>div>label {{
+            color: white;
+            font-size: 16px;
+        }}
+        .feature-box {{
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }}
+        .banner-text {{
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown(f"""
+        <style>
+        .stApp {{
+            {background_style}
+        }}
+        h1, h2, h3 {{
+            {header_style}
+        }}
+        .stButton>button {{
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }}
+        .stButton>button:hover {{
+            background-color: #45a049;
+        }}
+        .stRadio>div>label {{
+            color: {'black' if theme == "Light" else 'white'};
+            font-size: 16px;
+        }}
+        .feature-box {{
+            background-color: {'#e0e2e6' if theme == "Light" else 'rgba(255, 255, 255, 0.1)'};
+            padding: 20px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }}
+        .banner-text {{
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: {'black' if theme == "Light" else 'white'};
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
 
 # Cache pickle loading
 @st.cache_resource
@@ -63,50 +157,44 @@ reg_model = load_pickle(os.path.join(BASE_DIR, "Pickles", "best_model_reg.pkl"))
 clust_model = load_pickle(os.path.join(BASE_DIR, "Pickles", "best_model_clust.pkl"))
 preprocessor = load_pickle(os.path.join(BASE_DIR, "Pickles", "preprocessed_data.pkl"))
 
-# Debug model features
-def debug_model_features(model, df, show_debug=False):
+# Debug model features (simplified for retraining approach)
+def debug_model_features(df, features_used, show_debug=False):
     if not show_debug:
         return
-    st.write("### Model Debugging Information")
-    if hasattr(model, 'feature_names_in_'):
-        expected = model.feature_names_in_
-        st.write(f"Model expects {len(expected)} features: {expected}")
-        common = [col for col in expected if col in df.columns]
-        st.write(f"Found {len(common)}/{len(expected)} features in data")
-        if common != expected:
-            st.write("Missing features:", [f for f in expected if f not in df.columns])
-    else:
-        st.write("Model doesn't provide feature names")
+    st.write("### Debugging Information")
+    st.write(f"Features used for retraining: {features_used}")
     st.write("Available dataframe features:", df.columns.tolist())
 
-# Feature engineering
+# Feature engineering with early validation
 @st.cache_data
 def feature_engineering(df):
     df = df.copy()
-    if 'price_2' in df.columns:
-        df['price_ratio'] = df['price'] / df['price_2']
+    # Early validation for required columns
+    required_cols = ['total_clicks', 'unique_products', 'avg_price', 'browsing_depth', 'weekend']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        st.error(f"Cannot perform feature engineering due to missing columns: {missing_cols}. Please ensure your data includes these columns after initial processing.")
+        return df
+    # Check for valid data types and non-negative values
+    numeric_cols = ['total_clicks', 'unique_products', 'avg_price', 'browsing_depth']
+    for col in numeric_cols:
+        if not pd.api.types.is_numeric_dtype(df[col]):
+            st.error(f"Column '{col}' must be numeric for feature engineering. Found type: {df[col].dtype}")
+            return df
+        if (df[col] < 0).any():
+            st.error(f"Column '{col}' contains negative values, which are not allowed for feature engineering.")
+            return df
+    # Derived features
     df['clicks_per_product'] = df['total_clicks'] / df['unique_products'].replace(0, 1)
     df['price_per_click'] = df['avg_price'] / df['total_clicks'].replace(0, 1)
     df['price_browsing_interaction'] = df['avg_price'] * df['browsing_depth']
     df['weekend_clicks'] = df['weekend'] * df['total_clicks']
+    # Log transformations for skewed columns
     skewed_cols = ['total_clicks', 'unique_products', 'avg_price']
     for col in skewed_cols:
         if col in df.columns:
             df[f'log_{col}'] = np.log1p(df[col])
     return df
-
-# Align features with model's expected features
-def align_features(X_new, expected_features, numeric_cols=None):
-    X_new = X_new.copy()
-    missing_features = [f for f in expected_features if f not in X_new.columns]
-    for feature in missing_features:
-        if numeric_cols and feature in numeric_cols:
-            X_new[feature] = X_new[numeric_cols].mean().get(feature, 0)
-        else:
-            X_new[feature] = 0
-    X_new = X_new.drop(columns=[f for f in X_new.columns if f not in expected_features], errors='ignore')
-    X_new = X_new[expected_features]
-    return X_new, missing_features
 
 # Validate data
 def validate_data(df, required_cols=None):
@@ -140,23 +228,67 @@ if page == "Home":
     st.markdown("""
     ### Unlock Insights from Customer Behavior
     This application analyzes **clickstream data** to help e-commerce businesses understand customer behavior, predict conversions, and optimize strategies. Powered by machine learning, it provides actionable insights through classification, regression, and clustering.
-
-    #### What You Can Do:
-    - **Predict Purchases**: Determine the likelihood of a customer completing a purchase.
-    - **Estimate Spending**: Forecast how much customers are likely to spend.
-    - **Segment Customers**: Group customers based on browsing and purchasing patterns.
-    - **Visualize Insights**: Explore interactive charts and graphs to understand trends.
-
-    #### Get Started:
-    1. **Upload Data**: Use a CSV file with clickstream data (e.g., session_id, price, page).
-    2. **Enter Manually**: Input data point-by-point for quick analysis.
-    3. **Analyze**: Choose Classification, Regression, or Clustering to generate insights.
-    4. **Explore**: View visualizations and download predictions.
-
-    Ready to dive in? Navigate to the **Upload Data** or **Manual Entry** page to begin!
     """)
 
-    st.image(image_path if os.path.exists(image_path) else "https://via.placeholder.com/800x400", caption="Analyze Customer Behavior")
+    # Display the image with a banner overlay
+    st.markdown('<div style="position: relative;">', unsafe_allow_html=True)
+    with st.spinner("Loading banner image..."):
+        try:
+            st.image(
+                image_path if os.path.exists(image_path) else "https://via.placeholder.com/800x400",
+                caption=None,
+                use_container_width=True  # Updated parameter
+            )
+            st.markdown(
+                '<div class="banner-text">Analyze Customer Behavior with Machine Learning</div>',
+                unsafe_allow_html=True
+            )
+        except Exception as e:
+            st.error(f"Failed to load image: {e}. Using placeholder instead.")
+            st.image("https://via.placeholder.com/800x400", use_container_width=True)
+            st.markdown(
+                '<div class="banner-text">Analyze Customer Behavior with Machine Learning</div>',
+                unsafe_allow_html=True
+            )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    #### What You Can Do:
+    <div class="feature-box">
+        <h3 style="color: {header_color}">📊 Predict Purchases</h3>
+        <p>Determine the likelihood of a customer completing a purchase using classification models.</p>
+    </div>
+    <div class="feature-box">
+        <h3 style="color: {header_color}">💰 Estimate Spending</h3>
+        <p>Forecast how much customers are likely to spend with regression analysis.</p>
+    </div>
+    <div class="feature-box">
+        <h3 style="color: {header_color}">👥 Segment Customers</h3>
+        <p>Group customers based on browsing and purchasing patterns using clustering.</p>
+    </div>
+    <div class="feature-box">
+        <h3 style="color: {header_color}">📈 Visualize Insights</h3>
+        <p>Explore interactive charts and graphs to understand trends and patterns.</p>
+    </div>
+    """.format(header_color="#FFD700" if theme == "Dark" else "#333"), unsafe_allow_html=True)
+
+    st.markdown("""
+    #### Get Started:
+    Navigate to the **Upload Data** or **Manual Entry** page using the sidebar to begin analyzing your data. Ready to dive in?
+    """)
+
+    # Call-to-action buttons
+    col1, col2 = st.columns(2)
+    with col1:
+        st.button("Go to Upload Data", on_click=lambda: st.session_state.update({"page_selection": "Upload Data"}))
+    with col2:
+        st.button("Go to Manual Entry", on_click=lambda: st.session_state.update({"page_selection": "Manual Entry"}))
+
+    # Update page based on button clicks
+    if "page_selection" in st.session_state:
+        page = st.session_state.page_selection
+        st.rerun()
+
     st.markdown("""
     **Need Help?** Check the [Help](#help) page for detailed instructions and troubleshooting.
     """)
@@ -198,6 +330,7 @@ elif page == "Upload Data":
                 st.session_state.df_features = df_features
                 st.write("### Feature Engineered Data")
                 st.write(df_features.head())
+                st.success("Features computed successfully!")
 
         if st.button("Save Data"):
             if st.session_state.df_features is not None:
@@ -289,6 +422,7 @@ elif page == "Manual Entry":
                 st.session_state.df_features = df_features
                 st.write("### Feature Engineered Data")
                 st.write(df_features)
+                st.success("Features computed successfully!")
 
         if st.button("Save Data"):
             if st.session_state.df_features is not None:
@@ -306,7 +440,7 @@ elif page == "Classification":
         st.write(st.session_state.df_features.head())
 
         show_debug = st.checkbox("Show debug information")
-        debug_model_features(class_model, st.session_state.df_features, show_debug)
+        debug_model_features(st.session_state.df_features, [], show_debug)
 
         try:
             if hasattr(class_model, 'feature_names_in_'):
@@ -370,6 +504,9 @@ elif page == "Regression":
             'log_total_clicks', 'log_unique_products', 'log_avg_price'
         ]
         available_features = [col for col in basic_features if col in st.session_state.df_features.columns]
+
+        show_debug = st.checkbox("Show debug information")
+        debug_model_features(st.session_state.df_features, available_features, show_debug)
 
         if len(available_features) < 3:
             st.error(f"Insufficient features for retraining. Found only {len(available_features)} features: {available_features}")
@@ -520,118 +657,125 @@ elif page == "Help":
     This application helps you analyze customer clickstream data to predict purchase likelihood, spending amounts, and segment customers based on behavior. Below are instructions on how to access and use the app, along with tips for effective usage.
 
     ### Accessing the App
-    The Customer Conversion Analysis app can be accessed in the following ways:
-
     #### 1. Running Locally
     To run the app on your local machine:
-    - *Prerequisites*:
+    - **Prerequisites**:
       - Install Python 3.8 or higher.
       - Install required packages by running:
-        bash
+        ```bash
         pip install streamlit pandas scikit-learn plotly numpy
-        
+        ```
       - Ensure the project directory contains:
-        - app.py (this script)
-        - Pickles/ folder with best_model_class.pkl, best_model_reg.pkl, best_model_clust.pkl, and preprocessed_data.pkl
-        - Image/ folder with black-friday-elements-assortment.jpg
-    - *Steps*:
+        - `app.py` (this script)
+        - `Pickles/` folder with `best_model_class.pkl`, `best_model_reg.pkl`, `best_model_clust.pkl`, and `preprocessed_data.pkl` (optional for regression retraining)
+        - `Image/` folder with `black-friday-elements-assortment.jpg` (optional)
+    - **Steps**:
       1. Navigate to the project directory:
-         bash
+         ```bash
          cd D:\\Projects\\Mini_Projects\\Clickstream_customer_conversion
-         
+         ```
       2. Run the Streamlit app:
-         bash
+         ```bash
          streamlit run app.py
-         
-      3. Open your web browser and go to http://localhost:8501 (or the URL displayed in the terminal).
+         ```
+      3. Open your web browser and go to `http://localhost:8501`.
 
     #### 2. Accessing a Deployed Version
-    If the app is deployed (e.g., on Streamlit Community Cloud or another hosting service):
-    - Open your web browser and navigate to the provided URL (e.g., https://your-app-name.streamlit.app).
+    If the app is deployed (e.g., on Streamlit Community Cloud):
+    - Open your web browser and navigate to the provided URL (e.g., `https://your-app-name.streamlit.app`).
     - Contact the app administrator for the exact URL if hosted externally.
-    - No local installation is required; ensure you have a stable internet connection.
+    - No local installation is required; ensure a stable internet connection.
 
     #### 3. Accessing via Mobile Devices
-    - If hosted online, the app can be accessed via web browsers on iOS or Android devices (e.g., Safari, Chrome).
+    - If hosted online, access via web browsers on iOS or Android devices (e.g., Safari, Chrome).
     - Enter the deployed app’s URL in the browser.
-    - Note: The app is not available as a native iOS or Android app but is mobile-responsive when accessed via a browser.
+    - The app is mobile-responsive but not available as a native app.
 
     ### Using the App
-    The app has five main pages, accessible via the sidebar:
-    - *Upload Data*: Upload a CSV file with clickstream data (expected columns: year, month, 'day`, session_id, order, country, etc.). Compute and save features for analysis.
-    - *Manual Entry*: Enter individual data points manually using the form. Add multiple entries and compute features.
-    - *Classification*: Predict whether customers will complete a purchase. Requires computed features from uploaded or manual data.
-    - *Regression*: Predict customer spending amounts. Displays visualizations like scatter plots and histograms, and total prediction amount.
-    - *Clustering*: Segment customers into groups based on behavior. Adjust the number of clusters using the slider.
+    The app has several pages, accessible via the sidebar:
+    - **Home**: Overview of the app's capabilities with quick links to get started. Features a banner image (requires Streamlit 1.10.0+ for `use_container_width` parameter).
+    - **Upload Data**: Upload a CSV file with clickstream data (expected columns: `year`, `month`, `day`, `session_id`, `order`, `country`, `price`, etc.). Compute and save features for analysis.
+    - **Manual Entry**: Enter individual data points manually using the form. Add multiple entries and compute features.
+    - **Classification**: Predict whether customers will complete a purchase.
+    - **Regression**: Predict customer spending amounts using a retrained model. Displays visualizations (scatter plots, histograms) and total predicted spending.
+    - **Clustering**: Segment customers into groups based on behavior. Adjust the number of clusters using the slider.
+
+    #### New Features
+    - **Theme Toggle**: Switch between Light and Dark modes using the sidebar dropdown under "Theme Settings". Dark mode includes the background image, while Light mode uses a plain background for better readability.
+    - **Enhanced Home Page**: The Home Page now features a banner image with overlay text for a more engaging experience.
 
     #### Tips for Effective Use
-    - *Data Format*: Ensure CSV files include required columns (e.g., price, page2_clothing_model). Check the "Classification" or "Regression" debug info for missing features.
-    - *Manual Entry*: Use the "Add Entry" button to input multiple records before computing features.
-    - *Debugging*: Enable the "Show debug information" checkbox on analysis pages to troubleshoot feature mismatches.
-    - *Saving Predictions*: Use the "Save Predictions" button to download results as a CSV file.
-    - *Performance*: For large datasets, feature computation may take time. The app caches results to improve speed.
+    - **Data Format**: Ensure CSV files include required columns (e.g., `price`, `session_id`). For regression, the app requires `avg_price` as the target variable.
+    - **Manual Entry**: Use the "Add Entry" button to input multiple records before computing features.
+    - **Feature Computation**: Always compute features before saving data or running predictions.
+    - **Debugging**: Enable the "Show debug information" checkbox on the Regression page to see the features used for retraining.
+    - **Saving Predictions**: Predictions are automatically saved as `predictions_retrained.csv` and `total_prediction_retrained.txt` for regression.
+    - **Performance**: For large datasets, feature computation may take time. The app caches results for speed.
 
     ### Troubleshooting
-    - *Model Loading Errors*: Verify that all .pkl files are in the Pickles/ folder and are not corrupted.
-    - *Feature Mismatches*: If predictions fail, check debug info for missing features and ensure your data includes columns like total_clicks, avg_price, etc.
-    - *Image Not Found*: The background image is optional. If missing, the app will proceed without it.
-    - *Contact Support*: For issues, contact the app administrator or refer to the project documentation.
+    - **Feature Errors**: Ensure your data includes columns like `total_clicks`, `avg_price`, and `unique_products`. Recompute features if errors occur.
+    - **Model Loading Errors**: Verify that all `.pkl` files are in the `Pickles/` folder and are not corrupted. The regression page retrains a model, so it doesn't require a pre-trained regression model.
+    - **Image Not Found**: The background image is optional. The app will proceed without it if missing. You can switch to Light mode to avoid background image issues.
+    - **Prediction Failures**: Check for data inconsistencies (e.g., missing values, incorrect types) or recompute features.
+    - **Streamlit Version Issues**: The app requires Streamlit 1.28.0 or higher for features like `st.rerun()` and `use_container_width`. Update Streamlit if you encounter compatibility issues:
+      ```bash
+      pip install --upgrade streamlit
+      ```
+    - **Contact Support**: For issues, contact the app administrator or refer to the project documentation.
 
     For further assistance, revisit this Help page or check the project repository (if available).
     """)
-    
-    # =========================== Help & Footer =============================
+
+# Sidebar Footer
 with st.sidebar:
     st.markdown("---")
     st.markdown("""
-    ### How to use:
-    
-    1. *Upload your clickstream dataset* in CSV format, or use the *manual form input* option  
-    2. Choose between *Classification, **Regression, or **Clustering* mode from the sidebar  
-    3. Click *'Predict'* or *'Analyze'* to get customer conversion outcomes and insights  
-    4. Go to the *Visualizations tab* to explore key plots like session durations, conversion funnels, and feature importance  
-    5. Use the *Segment Insights tab* to understand customer behavior and segment-wise patterns  
-""")
+    ### How to Use:
+    1. **Upload your clickstream dataset** in CSV format, or use the **manual form input** option  
+    2. Choose between **Classification**, **Regression**, or **Clustering** mode from the sidebar  
+    3. Click **'Predict'** or **'Analyze'** to get customer conversion outcomes and insights  
+    4. Explore **visualizations** to understand trends and patterns  
+    5. Use the **Reset Data** button to clear session state if needed  
+    """)
 
-    st.sidebar.markdown("### About the model:")
+    st.sidebar.markdown("### About the Model:")
     st.sidebar.markdown("""
-    This application uses pre-trained Machine Learning models optimized for clickstream behavior analysis:
-    - *Classification* models predict whether a user is likely to convert  
-    - *Regression* models estimate *potential revenue* or *spend per session*  
-    - *Clustering* groups users into behavioral segments (e.g., window shoppers, buyers, bounce users)
+    This app uses machine learning models optimized for clickstream analysis:
+    - **Classification**: Predicts conversion likelihood  
+    - **Regression**: Estimates spending (retrained with available features)  
+    - **Clustering**: Groups users into behavioral segments  
 
-    Key features:
-    - Data cleaning, feature engineering, and one-hot encoding pipelines  
-    - Models include *Logistic Regression, **RandomForest, **KMeans*, and others  
-    - Interactive prediction with *real-time feedback and visuals*
-""")
-
-    st.sidebar.markdown("### Evaluation metrics:")
-    st.sidebar.markdown("""
-    - *Classification:* Accuracy, Precision, Recall, F1-score, ROC-AUC  
-    - *Regression:* MAE, RMSE, R² Score  
-    - *Clustering:* Silhouette Score, Inertia, Segment Breakdown  
-    - Visualization of confusion matrix, regression plots, and cluster assignments
-""")
+    **Key Features**:
+    - Automated feature engineering  
+    - Interactive visualizations  
+    - Real-time feedback  
+    - Theme toggle (Light/Dark mode)  
+    """)
 
     st.sidebar.markdown("### Notes:")
     st.sidebar.markdown("""
-    - No data is stored – *privacy is fully respected*  
-    - Designed for *E-commerce and Retail Analytics* teams and researchers  
-    - *App is in beta* – ongoing improvements and support for A/B testing metrics coming soon  
-    - Use insights to optimize UX, marketing funnels, and conversion strategies  
-    - *Happy analyzing – know your customers, grow your conversions! 📊*
+    - No data is stored – **privacy respected**  
+    - Designed for **e-commerce analytics**  
+    - **Beta version** – more features coming soon!  
+    - **Happy analyzing! 📊**
     """)
+
+# Save Predictions
 if page in ["Classification", "Regression", "Clustering"]:
-    if st.button("Save Predictions"):
+    if st.button("Download Predictions"):
         if "df_features" in st.session_state and st.session_state.df_features is not None:
-            csv = st.session_state.df_features.to_csv(index=False)
-            st.download_button(
-                label="Download Predictions",
-                data=csv,
-                file_name="predictions.csv",
-                mime="text/csv",
-            )
-            st.success("Predictions ready for download!")
+            if ("Prediction" in st.session_state.df_features.columns or 
+                "Predicted_Spending" in st.session_state.df_features.columns or 
+                "Cluster" in st.session_state.df_features.columns):
+                csv = st.session_state.df_features.to_csv(index=False)
+                st.download_button(
+                    label="Download Predictions as CSV",
+                    data=csv,
+                    file_name="predictions.csv",
+                    mime="text/csv",
+                )
+                st.success("Predictions ready for download!")
+            else:
+                st.warning("No predictions available to download. Please run the analysis first.")
         else:
-            st.warning("No predictions available to save.")
+            st.warning("No data available to save. Please upload or enter data and compute features.")
